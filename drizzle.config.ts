@@ -1,10 +1,14 @@
-import { defineConfig } from "drizzle-kit";
+import {defineConfig} from "drizzle-kit";
 
 export default defineConfig({
     dialect: "mysql",
     schema: "./db/schema/*",
     out: "./drizzle",
-    dbCredentials:{
-        url: "mysql://root:MyNewPass4!@10.0.0.236:3306/hono_demo",
+    dbCredentials: {
+        host: "10.0.0.236",
+        port: 3306,
+        user: "root",
+        password: "MyNewPass4!",
+        database: "hono_demo",
     }
 });

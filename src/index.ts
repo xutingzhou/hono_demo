@@ -5,9 +5,12 @@ import {HTTPException} from "hono/http-exception";
 import {logger} from "hono/logger";
 import {basicAuth} from "hono/basic-auth";
 import {prettyJSON} from "hono/pretty-json";
-import {NewUser, users} from "../db/schema/users";
-import {db} from "../db";
-import {except} from "hono/combine";
+import {addUser, getUserByUsername, getUsers, NewUser} from "../db/schema/users";
+import {every, except} from "hono/combine";
+import {csrf} from "hono/csrf";
+import {Result} from "./result";
+import moment from "moment";
+import {NotFoundEntityException} from "../db";
 
 type Variables = JwtVariables;
 
@@ -16,7 +19,7 @@ const jwtSecret = 'it-is-very-secret'
 
 app.use(logger());
 app.use(prettyJSON());
-// app.use(csrf({origin: ["www.3x5c2.cn", "3x5c2.cn"]}));
+app.use(csrf({origin: ["www.3x5c2.cn", "3x5c2.cn"]}));
 app.use(
     "/api/swagger/*",
     basicAuth({
@@ -26,22 +29,43 @@ app.use(
 );
 app.use(
     "/api/*",
-    except(["/api/login", "/api/swagger/*"], jwt({secret: jwtSecret})),
+    except(
+        ["/api/login", "/api/swagger/*"],
+        every(
+            jwt({secret: jwtSecret}),
+            async (c, next) => {
+                const {username, gt} = c.get('jwtPayload')
+                const user = await getUserByUsername(username);
+                if (moment(gt).isBefore(moment().subtract(30, 'day')) || moment(gt).isAfter(moment(user.passwordChangeTime))) {
+                    throw new HTTPException(401, {message: "Token expired"})
+                }
+                await next()
+            }
+        ),
+    ),
 );
 
+app.notFound((c) => {
+    return c.json({error: "No Found This API"}, 404);
+});
+app.onError((err, c) => {
+    if (err instanceof HTTPException) {
+        return c.json(Result.error(err.status, err.message), err.status);
+    }
+    if (err instanceof NotFoundEntityException) {
+        return c.json(Result.error(404, err.message), 404);
+    }
+    return c.json(Result.error(500, err.message), 500);
+});
 
 app.get("/users", async (c) => {
-    return c.json(await db.select().from(users));
+    return c.json(await getUsers());
 });
 
 app.post("/users", async (c) => {
     const params = await c.req.json<NewUser>();
     return c.json(
-        await db.insert(users).values({
-            fullName: params.fullName,
-            phone: params.phone,
-            password: params.password,
-        }),
+        await addUser(params),
     );
 });
 
@@ -80,11 +104,18 @@ app.openapi(
     }),
     async (c) => {
         const {username, password} = await c.req.json();
-        if (username === "admin" && password === "admin") {
-            const token = await sign({username}, jwtSecret);
-            return c.json({token});
+        try {
+            const user = await getUserByUsername(username);
+            if (user.password === password) {
+                const token = await sign({username, "gt": moment().valueOf()}, jwtSecret);
+                return c.json(Result.success({token}));
+            }
+        } catch (e) {
+            if (e instanceof NotFoundEntityException) {
+                throw new HTTPException(401, {message: e.message});
+            }
         }
-        throw new HTTPException(401, {message: "Unauthorized"});
+        throw new HTTPException(401, {message: "账号或密码错误"});
     },
 );
 app.openapi(

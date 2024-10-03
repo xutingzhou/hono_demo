@@ -11,3 +11,7 @@ const poolConnection = mysql.createPool({
     debug: true,
 });
 export const db = drizzle(poolConnection);
+
+export class NotFoundEntityException extends Error {
+
+}

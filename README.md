@@ -4,5 +4,6 @@
    ```
    bunx drizzle-kit generat
    bunx drizzle-kit migrate
+   bunx drizzle-kit studio
    ```
 4. swagger
