@@ -5,36 +5,37 @@ import {HTTPException} from "hono/http-exception";
 import {logger} from "hono/logger";
 import {basicAuth} from "hono/basic-auth";
 import {prettyJSON} from "hono/pretty-json";
-import {users} from "../db/schema/users";
+import {NewUser, users} from "../db/schema/users";
 import {db} from "../db";
+import {except} from "hono/combine";
 
 type Variables = JwtVariables;
 
 const app = new OpenAPIHono<{ Variables: Variables }>();
 const jwtSecret = 'it-is-very-secret'
 
-app.use(logger())
-app.use(prettyJSON())
+app.use(logger());
+app.use(prettyJSON());
+// app.use(csrf({origin: ["www.3x5c2.cn", "3x5c2.cn"]}));
 app.use(
-    '/auth/*',
-    jwt({
-        secret: jwtSecret,
-    })
-)
-app.use(
-    '/ui',
+    "/api/swagger/*",
     basicAuth({
         username: 'hono',
         password: 'hono',
-    })
-)
+    }),
+);
+app.use(
+    "/api/*",
+    except(["/api/login", "/api/swagger/*"], jwt({secret: jwtSecret})),
+);
+
 
 app.get("/users", async (c) => {
     return c.json(await db.select().from(users));
 });
 
 app.post("/users", async (c) => {
-    const params = await c.req.json<typeof users.$inferSelect>();
+    const params = await c.req.json<NewUser>();
     return c.json(
         await db.insert(users).values({
             fullName: params.fullName,
@@ -46,32 +47,8 @@ app.post("/users", async (c) => {
 
 app.openapi(
     createRoute({
-        method: "get",
-        path: "/hello",
-        summary: "Say hello",
-        responses: {
-            200: {
-                description: "Respond a message",
-                content: {
-                    "application/json": {
-                        schema: z.object({
-                            message: z.string(),
-                        }),
-                    },
-                },
-            },
-        },
-    }),
-    (c) => {
-        return c.json({
-            message: "hello",
-        });
-    },
-);
-app.openapi(
-    createRoute({
         method: "post",
-        path: "/login",
+        path: "/api/login",
         summary: "Login",
         request: {
             body: {
@@ -113,7 +90,7 @@ app.openapi(
 app.openapi(
     createRoute({
         method: "get",
-        path: "/auth/hello",
+        path: "/api/hello",
         summary: "Say hello with auth",
         responses: {
             200: {
@@ -136,16 +113,16 @@ app.openapi(
 );
 
 app.get(
-    '/ui',
+    '/api/swagger/ui',
     swaggerUI({
-        url: '/doc',
+        url: '/api/swagger/doc',
     })
 )
 
-app.doc('/doc', {
+app.doc('/api/swagger/doc', {
     info: {
-        title: 'An API',
-        version: 'v1'
+        title: '3x5c2 API',
+        version: '241003',
     },
     openapi: '3.1.0'
 })

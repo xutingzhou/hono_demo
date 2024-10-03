@@ -8,6 +8,20 @@
       "when": 1727871833784,
       "tag": "0000_handy_sumo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1727875420500,
+      "tag": "0001_perfect_true_believers",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1727952467364,
+      "tag": "0002_empty_smasher",
+      "breakpoints": true
     }
   ]
 }
